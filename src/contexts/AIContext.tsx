@@ -1,3 +1,4 @@
+/* eslint-disable react-refresh/only-export-components */
 import React, {
   createContext,
   useCallback,
@@ -86,29 +87,39 @@ export const AIContextProvider = ({
     async (question: string) => {
       if (!broker) return null;
 
-      const { endpoint, model } = await broker.inference.getServiceMetadata(
-        process.env.PROVIDER_ADDRESS!
-      );
-      const headers = await broker.inference.getRequestHeaders(
-        process.env.PROVIDER_ADDRESS!,
-        question
-      );
+      try {
+        const { endpoint, model } = await broker.inference.getServiceMetadata(
+          process.env.PROVIDER_ADDRESS!
+        );
+        const headers = await broker.inference.getRequestHeaders(
+          process.env.PROVIDER_ADDRESS!,
+          question
+        );
 
-      const response = await fetch(`${endpoint}/chat/completions`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json", ...headers },
-        body: JSON.stringify({
-          messages: [
-            { role: "system", content: process.env.SYSTEM_PROMPT! },
-            { role: "user", content: question },
-          ],
-          model: model,
-        }),
-      });
+        const response = await fetch(`${endpoint}/chat/completions`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json", ...headers },
+          body: JSON.stringify({
+            messages: [
+              { role: "system", content: process.env.SYSTEM_PROMPT! },
+              { role: "user", content: question },
+            ],
+            model,
+          }),
+        });
 
-      const data = await response.json();
-      const answer = data.choices[0].message.content;
-      return answer as string;
+        if (!response.ok) {
+          console.error("AI service responded with", response.statusText);
+          return null;
+        }
+
+        const data = await response.json();
+        const answer = data?.choices?.[0]?.message?.content;
+        return typeof answer === "string" ? answer : null;
+      } catch (err) {
+        console.error("Failed to fetch AI response", err);
+        return null;
+      }
     },
     [broker]
   );

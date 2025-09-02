@@ -1,3 +1,4 @@
+/* eslint-disable react-refresh/only-export-components */
 import React, { createContext, useCallback, useContext, useMemo } from "react";
 import { ethers } from "ethers";
 import { useWeb3 } from "./Web3Context";
@@ -36,7 +37,7 @@ export const StorageContextProvider = ({
 }: {
   children: React.ReactNode;
 }) => {
-  const { signer, provider } = useWeb3();
+  const { signer } = useWeb3();
   const indexer = useMemo(() => new Indexer(process.env.INDEXER_RPC!), []);
 
   const uploadFile = useCallback(
@@ -53,11 +54,12 @@ export const StorageContextProvider = ({
       }
 
       // Upload to network
-      const [tx, uploadErr] = await indexer.upload(
-        file,
-        process.env.RPC_URL!,
-        signer as any
-      );
+        const [tx, uploadErr] = await indexer.upload(
+          file,
+          process.env.RPC_URL!,
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          signer as any
+        );
       if (uploadErr !== null) {
         throw new Error(`Upload error: ${uploadErr}`);
       }
@@ -66,7 +68,7 @@ export const StorageContextProvider = ({
 
       return { rootHash: tree?.rootHash(), txHash: tx };
     },
-    [signer]
+    [signer, indexer]
   );
 
   const downloadFile = useCallback(
@@ -76,16 +78,19 @@ export const StorageContextProvider = ({
         throw new Error(`Download error: ${err}`);
       }
     },
-    [signer]
+    [indexer]
   );
 
   const uploadToKV = useCallback(
     async (streamId: string, key: string, value: string) => {
+      if (!signer) throw new Error("Signer not available");
+
       const [nodes, err] = await indexer.selectNodes(1);
       if (err !== null) {
         throw new Error(`Error selecting nodes: ${err}`);
       }
 
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const flowContract = getFlowContract(signer.address, signer as any);
 
       const batcher = new Batcher(1, nodes, flowContract, process.env.RPC_URL!);
@@ -100,7 +105,7 @@ export const StorageContextProvider = ({
       }
       return tx;
     },
-    []
+    [indexer, signer]
   );
 
   const downloadFromKV = useCallback(async (streamId: string, key: string) => {
@@ -110,6 +115,7 @@ export const StorageContextProvider = ({
     );
     const value = await kvClient.getValue(
       streamId,
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       ethers.encodeBase64(keyBytes) as any
     );
     return value;
